@@ -14,7 +14,7 @@ interface IBlurExchange {
         IExecutionDelegate _executionDelegate,
         IPolicyManager _policyManager,
         address _oracle,
-        uint _blockRange
+        uint256 _blockRange
     ) external;
     function setExecutionDelegate(IExecutionDelegate _executionDelegate) external;
 
@@ -30,7 +30,5 @@ interface IBlurExchange {
 
     function incrementNonce() external;
 
-    function execute(Input calldata sell, Input calldata buy)
-        external
-        payable;
+    function execute(Input calldata sell, Input calldata buy) external payable;
 }

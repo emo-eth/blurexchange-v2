@@ -14,11 +14,7 @@ library MerkleVerifier {
      * @param root root
      * @param proof proof
      */
-    function _verifyProof(
-        bytes32 leaf,
-        bytes32 root,
-        bytes32[] memory proof
-    ) public pure {
+    function _verifyProof(bytes32 leaf, bytes32 root, bytes32[] memory proof) public pure {
         bytes32 computedRoot = _computeRoot(leaf, proof);
         if (computedRoot != root) {
             revert InvalidProof();
@@ -30,10 +26,7 @@ library MerkleVerifier {
      * @param leaf leaf
      * @param proof proof
      */
-    function _computeRoot(
-        bytes32 leaf,
-        bytes32[] memory proof
-    ) public pure returns (bytes32) {
+    function _computeRoot(bytes32 leaf, bytes32[] memory proof) public pure returns (bytes32) {
         bytes32 computedHash = leaf;
         for (uint256 i = 0; i < proof.length; i++) {
             bytes32 proofElement = proof[i];
@@ -46,10 +39,7 @@ library MerkleVerifier {
         return a < b ? _efficientHash(a, b) : _efficientHash(b, a);
     }
 
-    function _efficientHash(
-        bytes32 a,
-        bytes32 b
-    ) private pure returns (bytes32 value) {
+    function _efficientHash(bytes32 a, bytes32 b) private pure returns (bytes32 value) {
         assembly {
             mstore(0x00, a)
             mstore(0x20, b)

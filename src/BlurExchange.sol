@@ -13,22 +13,13 @@ import "./interfaces/IBlurPool.sol";
 import "./interfaces/IExecutionDelegate.sol";
 import "./interfaces/IPolicyManager.sol";
 import "./interfaces/IMatchingPolicy.sol";
-import {
-  Side,
-  SignatureVersion,
-  AssetType,
-  Fee,
-  Order,
-  Input,
-  Execution
-} from "./lib/OrderStructs.sol";
+import {Side, SignatureVersion, AssetType, Fee, Order, Input, Execution} from "./lib/OrderStructs.sol";
 
 /**
  * @title BlurExchange
  * @dev Core Blur exchange contract
  */
 contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgradeable, UUPSUpgradeable {
-
     /* Auth */
     uint256 public isOpen;
 
@@ -58,6 +49,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         isOpen = 1;
         emit Opened();
     }
+
     function close() external onlyOwner {
         isOpen = 0;
         emit Closed();
@@ -66,7 +58,6 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
     // required by the OZ UUPS module
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-
     /* Constants */
     string public constant NAME = "Blur Exchange";
     string public constant VERSION = "1.0";
@@ -74,7 +65,6 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
     address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant POOL = 0x0000000000A39bb272e79075ade125fd351887Ac;
     uint256 private constant MAX_FEE_RATE = 250;
-
 
     /* Variables */
     IExecutionDelegate public executionDelegate;
@@ -89,22 +79,15 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
     bool public isInternal = false;
     uint256 public remainingETH = 0;
 
-
     /* Governance Variables */
     uint256 public feeRate;
     address public feeRecipient;
 
     address public governor;
 
-
     /* Events */
     event OrdersMatched(
-        address indexed maker,
-        address indexed taker,
-        Order sell,
-        bytes32 sellHash,
-        Order buy,
-        bytes32 buyHash
+        address indexed maker, address indexed taker, Order sell, bytes32 sellHash, Order buy, bytes32 buyHash
     );
 
     event OrderCancelled(bytes32 hash);
@@ -119,7 +102,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
     event NewGovernor(address governor);
 
     constructor() {
-      _disableInitializers();
+        _disableInitializers();
     }
 
     /* Constructor (for ERC1967) */
@@ -127,17 +110,14 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         IExecutionDelegate _executionDelegate,
         IPolicyManager _policyManager,
         address _oracle,
-        uint _blockRange
+        uint256 _blockRange
     ) external initializer {
         __Ownable_init();
         isOpen = 1;
 
-        DOMAIN_SEPARATOR = _hashDomain(EIP712Domain({
-            name              : NAME,
-            version           : VERSION,
-            chainId           : block.chainid,
-            verifyingContract : address(this)
-        }));
+        DOMAIN_SEPARATOR = _hashDomain(
+            EIP712Domain({name: NAME, version: VERSION, chainId: block.chainid, verifyingContract: address(this)})
+        );
 
         executionDelegate = _executionDelegate;
         policyManager = _policyManager;
@@ -151,12 +131,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @param sell Sell input
      * @param buy Buy input
      */
-    function execute(Input calldata sell, Input calldata buy)
-        external
-        payable
-        whenOpen
-        setupExecution
-    {
+    function execute(Input calldata sell, Input calldata buy) external payable whenOpen setupExecution {
         _execute(sell, buy);
         _returnDust();
     }
@@ -165,12 +140,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @dev Bulk execute multiple matches
      * @param executions Potential buy/sell matches
      */
-    function bulkExecute(Execution[] calldata executions)
-        external
-        payable
-        whenOpen
-        setupExecution
-    {
+    function bulkExecute(Execution[] calldata executions) external payable whenOpen setupExecution {
         /*
         REFERENCE
         uint256 executionsLength = executions.length;
@@ -183,7 +153,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         uint256 executionsLength = executions.length;
 
         if (executionsLength == 0) {
-          revert("No orders to execute");
+            revert("No orders to execute");
         }
         for (uint8 i = 0; i < executionsLength; i++) {
             assembly {
@@ -194,9 +164,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
 
                 let size
                 switch eq(add(i, 0x01), executionsLength)
-                case 1 {
-                    size := sub(calldatasize(), order_pointer)
-                }
+                case 1 { size := sub(calldatasize(), order_pointer) }
                 default {
                     let next_order_location := calldataload(add(executions.offset, mul(add(i, 0x01), 0x20)))
                     let next_order_pointer := add(executions.offset, next_order_location)
@@ -242,21 +210,9 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         cancelledOrFilled[buyHash] = true;
 
         _executeFundsTransfer(
-            sell.order.trader,
-            buy.order.trader,
-            sell.order.paymentToken,
-            sell.order.fees,
-            buy.order.fees,
-            price
+            sell.order.trader, buy.order.trader, sell.order.paymentToken, sell.order.fees, buy.order.fees, price
         );
-        _executeTokenTransfer(
-            sell.order.collection,
-            sell.order.trader,
-            buy.order.trader,
-            tokenId,
-            amount,
-            assetType
-        );
+        _executeTokenTransfer(sell.order.collection, sell.order.trader, buy.order.trader, tokenId, amount, assetType);
 
         emit OrdersMatched(
             sell.order.listingTime <= buy.order.listingTime ? sell.order.trader : buy.order.trader,
@@ -303,69 +259,47 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         emit NonceIncremented(msg.sender, nonces[msg.sender]);
     }
 
-
     /* Setters */
 
-    function setExecutionDelegate(IExecutionDelegate _executionDelegate)
-        external
-        onlyOwner
-    {
+    function setExecutionDelegate(IExecutionDelegate _executionDelegate) external onlyOwner {
         require(address(_executionDelegate) != address(0), "Address cannot be zero");
         executionDelegate = _executionDelegate;
         emit NewExecutionDelegate(executionDelegate);
     }
 
-    function setPolicyManager(IPolicyManager _policyManager)
-        external
-        onlyOwner
-    {
+    function setPolicyManager(IPolicyManager _policyManager) external onlyOwner {
         require(address(_policyManager) != address(0), "Address cannot be zero");
         policyManager = _policyManager;
         emit NewPolicyManager(policyManager);
     }
 
-    function setOracle(address _oracle)
-        external
-        onlyOwner
-    {
+    function setOracle(address _oracle) external onlyOwner {
         require(_oracle != address(0), "Address cannot be zero");
         oracle = _oracle;
         emit NewOracle(oracle);
     }
 
-    function setBlockRange(uint256 _blockRange)
-        external
-        onlyOwner
-    {
+    function setBlockRange(uint256 _blockRange) external onlyOwner {
         blockRange = _blockRange;
         emit NewBlockRange(blockRange);
     }
 
-    function setGovernor(address _governor)
-        external
-        onlyOwner
-    {
+    function setGovernor(address _governor) external onlyOwner {
         governor = _governor;
         emit NewGovernor(governor);
     }
 
-    function setFeeRate(uint256 _feeRate)
-        external
-    {
+    function setFeeRate(uint256 _feeRate) external {
         require(msg.sender == governor, "Fee rate can only be set by governor");
         require(_feeRate <= MAX_FEE_RATE, "Fee cannot be more than 2.5%");
         feeRate = _feeRate;
         emit NewFeeRate(feeRate);
     }
 
-    function setFeeRecipient(address _feeRecipient)
-        external
-        onlyOwner
-    {
+    function setFeeRecipient(address _feeRecipient) external onlyOwner {
         feeRecipient = _feeRecipient;
         emit NewFeeRecipient(feeRecipient);
     }
-
 
     /* Internal Functions */
 
@@ -374,19 +308,15 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @param order order
      * @param orderHash hash of order
      */
-    function _validateOrderParameters(Order calldata order, bytes32 orderHash)
-        internal
-        view
-        returns (bool)
-    {
-        return (
-            /* Order must have a trader. */
-            (order.trader != address(0)) &&
+    function _validateOrderParameters(Order calldata order, bytes32 orderHash) internal view returns (bool) {
+        return
+        /* Order must have a trader. */
+        (
+            (order.trader != address(0))
             /* Order must not be cancelled or filled. */
-            (!cancelledOrFilled[orderHash]) &&
+            && (!cancelledOrFilled[orderHash])
             /* Order must be settleable. */
-            (order.listingTime < block.timestamp) &&
-            (block.timestamp < order.expirationTime)
+            && (order.listingTime < block.timestamp) && (block.timestamp < order.expirationTime)
         );
     }
 
@@ -395,41 +325,25 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @param order order
      * @param orderHash hash of order
      */
-    function _validateSignatures(Input calldata order, bytes32 orderHash)
-        internal
-        view
-        returns (bool)
-    {
-
+    function _validateSignatures(Input calldata order, bytes32 orderHash) internal view returns (bool) {
         if (order.order.extraParams.length > 0 && order.order.extraParams[0] == 0x01) {
             /* Check oracle authorization. */
             require(block.number - order.blockNumber < blockRange, "Signed block number out of range");
             if (
-                !_validateOracleAuthorization(
-                    orderHash,
-                    order.signatureVersion,
-                    order.extraSignature,
-                    order.blockNumber
-                )
+                !_validateOracleAuthorization(orderHash, order.signatureVersion, order.extraSignature, order.blockNumber)
             ) {
                 return false;
             }
         }
 
         if (order.order.trader == msg.sender) {
-          return true;
+            return true;
         }
 
         /* Check user authorization. */
         if (
             !_validateUserAuthorization(
-                orderHash,
-                order.order.trader,
-                order.v,
-                order.r,
-                order.s,
-                order.signatureVersion,
-                order.extraSignature
+                orderHash, order.order.trader, order.v, order.r, order.s, order.signatureVersion, order.extraSignature
             )
         ) {
             return false;
@@ -487,7 +401,9 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
     ) internal view returns (bool) {
         bytes32 oracleHash = _hashToSignOracle(orderHash, blockNumber);
 
-        uint8 v; bytes32 r; bytes32 s;
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
         if (signatureVersion == SignatureVersion.Single) {
             assembly {
                 v := calldataload(extraSignature.offset)
@@ -524,19 +440,13 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @param r r
      * @param s s
      */
-    function _verify(
-        address signer,
-        bytes32 digest,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) internal pure returns (bool) {
+    function _verify(address signer, bytes32 digest, uint8 v, bytes32 r, bytes32 s) internal pure returns (bool) {
         require(v == 27 || v == 28, "Invalid v parameter");
         address recoveredSigner = ecrecover(digest, v, r, s);
         if (recoveredSigner == address(0)) {
-          return false;
+            return false;
         } else {
-          return signer == recoveredSigner;
+            return signer == recoveredSigner;
         }
     }
 
@@ -554,11 +464,13 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         if (sell.listingTime <= buy.listingTime) {
             /* Seller is maker. */
             require(policyManager.isPolicyWhitelisted(sell.matchingPolicy), "Policy is not whitelisted");
-            (canMatch, price, tokenId, amount, assetType) = IMatchingPolicy(sell.matchingPolicy).canMatchMakerAsk(sell, buy);
+            (canMatch, price, tokenId, amount, assetType) =
+                IMatchingPolicy(sell.matchingPolicy).canMatchMakerAsk(sell, buy);
         } else {
             /* Buyer is maker. */
             require(policyManager.isPolicyWhitelisted(buy.matchingPolicy), "Policy is not whitelisted");
-            (canMatch, price, tokenId, amount, assetType) = IMatchingPolicy(buy.matchingPolicy).canMatchMakerBid(buy, sell);
+            (canMatch, price, tokenId, amount, assetType) =
+                IMatchingPolicy(buy.matchingPolicy).canMatchMakerBid(buy, sell);
         }
         require(canMatch, "Orders cannot be matched");
 
@@ -592,8 +504,8 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         uint256 sellerFeesPaid = _transferFees(sellerFees, paymentToken, buyer, price, true);
         uint256 buyerFeesPaid = _transferFees(buyerFees, paymentToken, buyer, price, false);
         if (paymentToken == address(0)) {
-          /* Need to account for buyer fees paid on top of the price. */
-          remainingETH -= buyerFeesPaid;
+            /* Need to account for buyer fees paid on top of the price. */
+            remainingETH -= buyerFeesPaid;
         }
 
         /* Transfer remainder to seller. */
@@ -608,13 +520,10 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @param price price of token
      * @return total fees paid
      */
-    function _transferFees(
-        Fee[] calldata fees,
-        address paymentToken,
-        address from,
-        uint256 price,
-        bool protocolFee
-    ) internal returns (uint256) {
+    function _transferFees(Fee[] calldata fees, address paymentToken, address from, uint256 price, bool protocolFee)
+        internal
+        returns (uint256)
+    {
         uint256 totalFee = 0;
 
         /* Take protocol fee if enabled. */
@@ -643,12 +552,7 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
      * @param to token recipient
      * @param amount amount to transfer
      */
-    function _transferTo(
-        address paymentToken,
-        address from,
-        address to,
-        uint256 amount
-    ) internal {
+    function _transferTo(address paymentToken, address from, address to, uint256 amount) internal {
         if (amount == 0) {
             return;
         }
@@ -701,18 +605,8 @@ contract BlurExchange is IBlurExchange, ReentrancyGuarded, EIP712, OwnableUpgrad
         uint256 _remainingETH = remainingETH;
         assembly {
             if gt(_remainingETH, 0) {
-                let callStatus := call(
-                    gas(),
-                    caller(),
-                    _remainingETH,
-                    0,
-                    0,
-                    0,
-                    0
-                )
-                if iszero(callStatus) {
-                  revert(0, 0)
-                }
+                let callStatus := call(gas(), caller(), _remainingETH, 0, 0, 0, 0)
+                if iszero(callStatus) { revert(0, 0) }
             }
         }
     }
